@@ -1,11 +1,11 @@
 version: 2.1
-
-# Define the jobs we want to run for this project
+orbs:
+  heroku: circleci/heroku@1.0.1
 jobs:
   build-and-test:
     executor: heroku/default
     docker:
-      - image: circleci/python:3.6.2:stretch-browsers
+      - image: circleci/python:3.6.2-stretch-browsers
         auth:
           username: mydockerhub-user
           password: $DOCKERHUB_PASSWORD  # context / project UI env-var reference
@@ -14,16 +14,16 @@ jobs:
       - restore_cache:
           key: deps1-{{ .Branch }}-{{ checksum "requirements.txt" }}
       - run:
-          name : Install Python deps in a venv
-          command : |
-            echo 'export TAG=0.1.${CIRCLE_BUILD_NUM}' >> $BASH_NEW
-            echo 'export IMAGE_NAME=${DOCKER_IMAGE_NAME}' >> $BASH_NEW
-            python3 -m new venv
+          name: Install Python deps in a venv
+          command: |
+            echo 'export TAG=0.1.${CIRCLE_BUILD_NUM}' >> $BASH_ENV
+            echo 'export IMAGE_NAME=python-circleci-docker' >> $BASH_ENV
+            python3 -m venv venv
             . venv/bin/activate
             pip install --upgrade pip
             pip install -r requirements.txt
       - save_cache:
-          key: deps1-{{ .Branch }}--{{ checksum "requirements.txt" }}
+          key: deps1-{{ .Branch }}-{{ checksum "requirements.txt" }}
           paths:
             - "venv"
 #      - run:
@@ -35,8 +35,8 @@ jobs:
 #          destination: tr1
 #      - store_test_results:
 #          path: test-reports/
-#      - setup_remote_docker:
-#          version: 19.03.13
+      - setup_remote_docker:
+          version: 19.03.13
       - run:
           name: Build and push Docker image
           command: |
@@ -48,8 +48,8 @@ jobs:
     steps:
       - checkout
       - run:
-          name : Storing previous commit
-          command : |
+          name: Storing previous commit
+          command: |
             git rev-parse HEAD > ./commit.txt
       - heroku/install
       - setup_remote_docker:
@@ -61,24 +61,12 @@ jobs:
             #heroku ps:scale web=1 -a $HEROKU_APP_NAME
             heroku container:push web -a $HEROKU_APP_NAME
             heroku container:release web -a $HEROKU_APP_NAME
-            
 
-#  test:
-#    docker:
-#      - image: cimg/<language>:<version TAG>
-#        auth:
-#          username: mydockerhub-user
-#          password: $DOCKERHUB_PASSWORD  # context / project UI env-var reference
-#    steps:
-#      - checkout
-#      - run: echo "this is the test job"
-
-# Orchestrate our job run sequence
 workflows:
-  build_and_test:
+  build-test-deploy:
     jobs:
       - build-and-test
-      - deploy :
+      - deploy:
           requires:
             - build-and-test
           filters:
